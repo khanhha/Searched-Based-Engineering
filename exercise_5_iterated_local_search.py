@@ -31,13 +31,6 @@ def total_distance(points):
 
 # - keep in mind that \[:-1\] means "all elements if the list without the last"
 # - *enumerate* is a function to enumerate all elements of a given sequence
-
-# In[5]:
-# enumerate example
-seasons = ['spring', 'summer', 'fall', 'winter']
-print(list(enumerate(seasons)))
-
-
 # In[6]:
 def traveling_salesman(points, start=None):
     """
@@ -55,9 +48,7 @@ def traveling_salesman(points, start=None):
 
 # - *permutations* returns tuples with all possible orderings without repeat
 # - function returns minimum of all possible tuples by the help of the function *total_distance* from above
-
 # In[21]:
-
 
 import datetime
 
@@ -122,10 +113,6 @@ def cartesian_matrix(coordinates):
 
 # This function takes a list of (x,y) tuples and outputs a dictionary that contains the distance between any pair of cities:
 m = cartesian_matrix([(0, 0), (1, 0), (1, 1)])
-print(m)
-print()
-print(m[2, 0])
-
 
 # \[2,0\] gives the distance between the city with number 2 and the city with  number 0.
 # In our case the result of \[2,0\] is the same for \[0,2\], but for other TSPs this may not be the case (for example if a street between two cities is only one way - we have to take another route)
@@ -207,25 +194,6 @@ def reversed_sections(tour):
                 yield copy
 
 
-def swap_2_opt(tour):
-    for i, j in all_pairs(len(tour)):
-        if i < j:
-            copy = deepcopy(tour)
-            copy[i:j] = reversed(tour[i:j])
-            yield copy
-
-# usage
-test_lst = []
-for tour in swapped_cities([1, 2, 3, 4,5]):
-    #test_lst.append(tour)
-    print(tour)
-
-print('my list: \n')
-print(test_lst)
-
-#for tour in reversed_sections([1, 2, 3, 4]):
-#    print(tour)
-
 # #### Getting Started with Hill Climbing
 def init_random_tour(tour_length):
     tour = list(range(tour_length))
@@ -236,144 +204,56 @@ init_function = lambda: init_random_tour(len(coords))
 objective_function = lambda tour: tour_length(matrix, tour)
 
 
-# #### Short Explanation of Lambda Functions
-# is the creation of an anonymous function
-# - lambda definition does not include a return statement
-# - it always contains an expression which is returned
-# - you can put a lambda definition anywhere a function is expected
-# - you don't have to assign it to a variable
-
-# To start with Hill Climbing, we need two functions:
-# - init function that returns a random solution
-# - objective function that tells us how "good" a solution is
-#
-# For the TSP, an init function will just return a tour of correct length that has cities aranged in random order.
-#
-# The objective function will return the length of a tour.
-#
-# We need to ensure that init function takes no arguments and returns a tour of the correct length and the objective function takes one argument (the solution tour) and returns its length.
-#
-# Assume we have the city coordinates in a variable *coords* and our distance matrix in *matrix*, we can define the objective function and init function by using *init_random_tour*:
-
-# In[52]:
-
-
 # normal function definition
 def f(x): return x ** 2
 
+def swap_2_opt(tour):
+    n = len(tour)
+    i = np.random.randint(0, n)
+    j = np.random.randint(0, n)
+    copy = deepcopy(tour)
+    copy[i : j] = reversed(tour[i:j])
+    return copy
 
-# lambda function definition
-g = lambda x: x ** 2
-print(f(5))
-print(g(5))
+def sample_local_solution(cur_solution, cur_score, objective_function, tweak_operator, max_local_samples):
+    next_solution = tweak_operator(cur_solution)
+    next_score = objective_function(next_solution)
+    n_attempts = 0
+    while next_score >= cur_score and n_attempts < max_local_samples:
+        next_solution= tweak_operator(cur_solution)
+        next_score = objective_function(next_solution)
+        n_attempts += 1
+    return next_solution, next_score, n_attempts
 
-local_diff = []
+def make_a_big_jump(tour):
+    n = len(tour)
+    steps = np.linspace(0, n, num=4).astype(int)
+    i = np.random.randint(steps[0], steps[1])
+    j = np.random.randint(steps[1], steps[2])
+    k = np.random.randint(steps[2], steps[3])
 
-# ## Basic Hill Climbing
-def hc(init_function, move_operator, objective_function, max_evaluations):
-    '''
-    Hillclimb until either max_evaluations is
-    reached or we are at a local optima.
-    '''
+    next = deepcopy(tour)
+    next[0:i], next[j:k] = tour[j:k], tour[0:i]
+    next[j:k], next[k:n] = tour[k:n], tour[j:k]
+    return next
 
-    global local_diff
-    local_diff = []
-
-
+def iterated_local_search(init_function, objective_function, tweak_operator, max_evaluations, max_local_samples = 10):
     best = init_function()
     best_score = objective_function(best)
 
-    num_evaluations = 1
-
-    while num_evaluations < max_evaluations:
-        # move around the current position
-        move_made = False
-        for next in move_operator(best):
-            if num_evaluations >= max_evaluations:
-                break
-
-            next_score = objective_function(next)
-
-            local_diff.append(abs(next_score-best_score))
-
-
-            num_evaluations += 1
-            if next_score < best_score:
-                best = next
-                best_score = next_score
-                move_made = True
-                break  # depth first search
-        if not move_made:
-            break  # couldn't find better move - must be a local max
-    return (num_evaluations, best_score, best)
-
-def steepest_hc(init_function, move_operator, objective_function, max_evaluations, max_local_samples):
-    best = init_function()
-    best_score = objective_function(best)
-
-    global local_diff
-    local_diff = []
+    next = deepcopy(best)
+    next_score = best_score
 
     num_evaluations = 0
-
     while num_evaluations < max_evaluations:
-        num_local_samples = 0
-        best_local_score = sys.maxsize
-        first_time = 0
+        next, next_score, n_tried = sample_local_solution(next, next_score, objective_function, tweak_operator, max_local_samples)
+        if next_score < best_score:
+            best = deepcopy(next)
+            best_score = next_score
 
-        #sample local space to find the steepest possible direction
-        for tweaked_local in move_operator(best):
-            tweaked_local_score = objective_function(tweaked_local)
-            if first_time == 0:
-                first_time = 1
-                best_local_score = tweaked_local_score
-                best_local = tweaked_local
+        num_evaluations += n_tried
 
-            if(tweaked_local_score < best_local_score):
-                best_local_score = tweaked_local_score
-                best_local = tweaked_local
-
-            num_evaluations += 1
-            num_local_samples += 1
-            if num_local_samples > max_local_samples:
-                break
-
-        local_diff.append(abs(best_local_score - best_score))
-
-        if best_local_score < best_score:
-            best = best_local
-            best_score = best_local_score
-
-    return (num_evaluations, best_score, best)
-
-def steepest_hc_replacement(init_function, move_operator, objective_function, max_evaluations, max_local_samples):
-    best = init_function()
-    S = best
-    best_score = objective_function(best)
-
-    num_evaluations = 0
-
-    while num_evaluations < max_evaluations:
-        num_local_samples = 0
-        best_local_score = sys.maxsize
-
-        #sample local space to find the steepest possible direction
-        for tweaked_local in move_operator(S):
-            tweaked_local_score = objective_function(tweaked_local)
-            if(tweaked_local_score < best_local_score):
-                best_local_score = tweaked_local_score
-                best_local = tweaked_local
-
-            num_evaluations += 1
-            num_local_samples += 1
-            if num_local_samples > max_local_samples:
-                break
-
-        S = best_local
-
-        if best_local_score < best_score:
-            best = best_local
-            best_score = best_local_score
+        next = make_a_big_jump(best)
 
     return (num_evaluations, best_score, best)
 
@@ -413,7 +293,6 @@ def write_tour_to_img(coords, tour, title, img_file):
     del d
     img.save(img_file, "PNG")
 
-
 # In[233]:
 def reload_image_for_jupyter(filename):
     # pick a random integer with 1 in 2 billion chance of getting the same
@@ -426,109 +305,33 @@ def reload_image_for_jupyter(filename):
     from IPython.display import HTML, display
     display(HTML('<img src="./' + filename + '?%d" alt="Schema of adaptive filter" height="100">' % __counter__))
 
-
 # In[254]:
-def do_hc_evaluations(evaluations, move_operator=swapped_cities):
+def do_iterated_local_search_evaluations(evaluations):
     max_evaluations = evaluations
     then = datetime.datetime.now()
-    num_evaluations, best_score, best = hc(init_function, move_operator, objective_function, max_evaluations)
+    num_evaluations, best_score, best = iterated_local_search(init_function, objective_function,
+                                                              tweak_operator=swap_2_opt, max_evaluations = max_evaluations, max_local_samples=100)
     now = datetime.datetime.now()
 
     print("computation time ", now - then)
     print(best_score)
     print(best)
-    filename = "hc_result_" + str(max_evaluations) + ".PNG"
+    filename = "iterated_local_search_" + str(max_evaluations) + ".PNG"
     write_tour_to_img(coords, best, filename, open(filename, "ab"))
     reload_image_for_jupyter(filename)
 
-def do_steepest_hc_evaluations(evaluations, max_local_samples, move_operator=swapped_cities):
-    max_evaluations = evaluations
-    then = datetime.datetime.now()
-    num_evaluations, best_score, best = steepest_hc(init_function, move_operator, objective_function, max_evaluations, max_local_samples)
-    now = datetime.datetime.now()
+def test_iterated_local_search():
+    init_temperature = 100000
 
-    print("computation time ", now - then)
-    print(best_score)
-    print(best)
-    filename = "steepest_hc_result_" + str(max_evaluations) + ".PNG"
-    write_tour_to_img(coords, best, filename, open(filename, "ab"))
-    reload_image_for_jupyter(filename)
-
-def do_steepest_hc_replacement_evaluations(evaluations, max_local_samples, move_operator=swapped_cities):
-    max_evaluations = evaluations
-    then = datetime.datetime.now()
-    num_evaluations, best_score, best = steepest_hc_replacement(init_function, move_operator, objective_function, max_evaluations, max_local_samples)
-    now = datetime.datetime.now()
-
-    print("computation time ", now - then)
-    print(best_score)
-    print(best)
-    filename = "steepest_hc_replacement_result_" + str(max_evaluations) + ".PNG"
-    write_tour_to_img(coords, best, filename, open(filename, "ab"))
-    reload_image_for_jupyter(filename)
-
-def test_hc():
-    # In[255]:
-    move_operator = swapped_cities
-    # move_operator = reversed_sections
     max_evaluations = 500
-    #do_hc_evaluations(max_evaluations, move_operator)
+    do_iterated_local_search_evaluations(max_evaluations)
 
-    # In[256]:
-    move_operator = swapped_cities
-    # move_operator = reversed_sections
     max_evaluations = 5000
-    #do_hc_evaluations(max_evaluations, move_operator)
+    do_iterated_local_search_evaluations(max_evaluations)
 
-    # In[258]:
-    # move_operator = swapped_cities
-    move_operator = reversed_sections
     max_evaluations = 50000
-    do_hc_evaluations(max_evaluations, move_operator)
+    do_iterated_local_search_evaluations(max_evaluations)
 
-def test_steepest_hc():
-    max_local_samples = 50
-    move_operator = swap_2_opt
-    # move_operator = reversed_sections
-    max_evaluations = 500
-    #do_steepest_hc_evaluations(max_evaluations, max_local_samples,  move_operator)
-
-    move_operator = swap_2_opt
-    # move_operator = reversed_sections
-    max_evaluations = 5000
-    #do_steepest_hc_evaluations(max_evaluations, max_local_samples, move_operator)
-
-    move_operator = swap_2_opt
-    # move_operator = reversed_sections
-    max_evaluations = 50000
-    do_steepest_hc_evaluations(max_evaluations, max_local_samples, move_operator)
-
-def test_steepest_hc_replacement():
-    max_local_samples = 10
-    move_operator = swap_2_opt
-    # move_operator = reversed_sections
-    max_evaluations = 500
-    do_steepest_hc_replacement_evaluations(max_evaluations, max_local_samples,  move_operator)
-
-    move_operator = swap_2_opt
-    # move_operator = reversed_sections
-    max_evaluations = 5000
-    do_steepest_hc_replacement_evaluations(max_evaluations, max_local_samples, move_operator)
-
-    move_operator = swap_2_opt
-    # move_operator = reversed_sections
-    max_evaluations = 50000
-    do_steepest_hc_replacement_evaluations(max_evaluations, max_local_samples, move_operator)
-
-test_steepest_hc()
+test_iterated_local_search()
+#draw_graphs()
 #test_hc()
-#test_steepest_hc_replacement()
-
-n = len(local_diff)
-x_ = np.arange(n)
-print(local_diff)
-plt.plot(x_, local_diff, 'ro')
-plt.xlim(0, n-1)
-plt.ylim(np.min(local_diff), np.max(local_diff))
-plt.show()
-

@@ -26,9 +26,9 @@ def total_distance(points):
     """
     return sum([distance(point, points[index + 1]) for index, point in enumerate(points[:-1])])
 
-
 # - keep in mind that \[:-1\] means "all elements if the list without the last"
 # - *enumerate* is a function to enumerate all elements of a given sequence
+
 # In[6]:
 def traveling_salesman(points, start=None):
     """
@@ -46,7 +46,9 @@ def traveling_salesman(points, start=None):
 
 # - *permutations* returns tuples with all possible orderings without repeat
 # - function returns minimum of all possible tuples by the help of the function *total_distance* from above
+
 # In[21]:
+
 
 import datetime
 
@@ -107,7 +109,6 @@ def cartesian_matrix(coordinates):
             distance = (dx ** 2 + dy ** 2) ** 0.5
             matrix[i, j] = distance
     return matrix
-
 
 # \[2,0\] gives the distance between the city with number 2 and the city with  number 0.
 # In our case the result of \[2,0\] is the same for \[0,2\], but for other TSPs this may not be the case (for example if a street between two cities is only one way - we have to take another route)
@@ -196,15 +197,6 @@ def swap_2_opt(tour):
             copy[i:j] = reversed(tour[i:j])
             yield copy
 
-def swap_2_operator(tour):
-    i = np.random.randint(0, len(tour))
-    j = np.random.randint(0, len(tour))
-    if i > j:
-        i, j = j, i
-    copy = deepcopy(tour)
-    copy[i : j] = reversed(tour[i:j])
-    return copy
-
 # #### Getting Started with Hill Climbing
 def init_random_tour(tour_length):
     tour = list(range(tour_length))
@@ -214,43 +206,44 @@ def init_random_tour(tour_length):
 init_function = lambda: init_random_tour(len(coords))
 objective_function = lambda tour: tour_length(matrix, tour)
 
-def simulated_annealing(init_function, tweak_operator, objective_function, max_evaluations, init_temperature, temp_points = None, iter_points = None):
+# normal function definition
+def f(x): return x ** 2
 
-    temperature = init_temperature
-    s = init_function()
-    best = deepcopy(s)
+def steepest_hc(init_function, move_operator, objective_function, max_evaluations, max_local_samples):
+    best = init_function()
     best_score = objective_function(best)
-    s_score = best_score
 
-    num_evaluations = 1
+    num_evaluations = 0
 
     while num_evaluations < max_evaluations:
-        next = tweak_operator(s)
-        next_score = objective_function(next)
+        num_local_samples = 0
+        best_local_score = sys.maxsize
+        first_time = 0
 
-        num_evaluations += 1
+        #sample local space to find the steepest possible direction
+        for tweaked_local in move_operator(best):
+            tweaked_local_score = objective_function(tweaked_local)
+            if first_time == 0:
+                first_time = 1
+                best_local_score = tweaked_local_score
+                best_local = tweaked_local
 
-        delta = (next_score - s_score)/s_score
-        if delta < 0 or \
-                        np.random.rand(1) < np.exp(-delta/temperature):
-            s_score = next_score
-            s = deepcopy(next)
+            if(tweaked_local_score < best_local_score):
+                best_local_score = tweaked_local_score
+                best_local = tweaked_local
 
-        temperature *= 0.998
-        if temp_points != None and iter_points != None:
-            temp_points.append(temperature)
-            iter_points.append(num_evaluations)
+            num_evaluations += 1
+            num_local_samples += 1
+            if num_local_samples > max_local_samples:
+                break
 
-        if temperature <= 0:
-            break
-
-        if s_score < best_score :
-            best_score = s_score
-            best = deepcopy(s)
+        if best_local_score < best_score:
+            best = best_local
+            best_score = best_local_score
 
     return (num_evaluations, best_score, best)
 
-# In[232]:
+
 from PIL import Image, ImageDraw, ImageFont
 
 def write_tour_to_img(coords, tour, title, img_file):
@@ -299,61 +292,31 @@ def reload_image_for_jupyter(filename):
     from IPython.display import HTML, display
     display(HTML('<img src="./' + filename + '?%d" alt="Schema of adaptive filter" height="100">' % __counter__))
 
-# In[254]:
-def do_simulated_annealing_evaluations(evaluations, move_operator=swap_2_operator, init_temperature=1000):
+def do_steepest_hc_evaluations(evaluations, max_local_samples, move_operator=swapped_cities):
     max_evaluations = evaluations
     then = datetime.datetime.now()
-    num_evaluations, best_score, best = simulated_annealing(init_function, move_operator, objective_function, max_evaluations, init_temperature)
+    num_evaluations, best_score, best = steepest_hc(init_function, move_operator, objective_function, max_evaluations, max_local_samples)
     now = datetime.datetime.now()
 
     print("computation time ", now - then)
     print(best_score)
     print(best)
-    filename = "simulated_annealing_result_" + str(max_evaluations) + ".PNG"
+    filename = "steepest_hc_result_" + str(max_evaluations) + ".PNG"
     write_tour_to_img(coords, best, filename, open(filename, "ab"))
     reload_image_for_jupyter(filename)
 
-def draw_graphs():
-    n_max_evals = np.arange(0, 50000, 1000)
-    costs = []
-    init_temp = 10000
-    for max_eval  in n_max_evals:
-        n_rin_eval, best_score, best = simulated_annealing(init_function, swap_2_operator, objective_function, max_eval, init_temp)
-        costs.append(best_score)
-
-    plt.plot(n_max_evals, costs)
-    plt.ylabel('Costs')
-    plt.xlabel('Iterations')
-    plt.savefig("simulated_annealing_costs_interations.png")
-
-    temp_points = []
-    iter_points = []
-    n_rin_eval, best_score, best = simulated_annealing(init_function, swap_2_operator, objective_function, 50000,
-                                                       init_temp, temp_points, iter_points)
-
-    plt.plot(iter_points, temp_points)
-    plt.xlabel('Iterations')
-    plt.ylabel('Temperature')
-    plt.savefig("simulated_annealing_iterations_temperature.png")
-
-def test_simulated_annealing():
-    init_temperature = 100000
-
-    move_operator = swap_2_operator
-    # move_operator = reversed_sections
+def test_steepest_hc():
+    max_local_samples = 50
+    move_operator = swap_2_opt
     max_evaluations = 500
-    do_simulated_annealing_evaluations(max_evaluations,  move_operator, init_temperature)
+    do_steepest_hc_evaluations(max_evaluations, max_local_samples,  move_operator)
 
-    move_operator = swap_2_operator
-    # move_operator = reversed_sections
+    move_operator = swap_2_opt
     max_evaluations = 5000
-    do_simulated_annealing_evaluations(max_evaluations, move_operator, init_temperature)
+    do_steepest_hc_evaluations(max_evaluations, max_local_samples, move_operator)
 
-    move_operator = swap_2_operator
-    # move_operator = reversed_sections
+    move_operator = swap_2_opt
     max_evaluations = 50000
-    do_simulated_annealing_evaluations(max_evaluations, move_operator, init_temperature)
+    do_steepest_hc_evaluations(max_evaluations, max_local_samples, move_operator)
 
-test_simulated_annealing()
-#draw_graphs()
-#test_hc()
+test_steepest_hc()

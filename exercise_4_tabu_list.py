@@ -14,8 +14,6 @@ def distance(p1, p2):
     """
     return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
 
-print(distance([3, 6], [7, 6]))
-
 def total_distance(points):
     """
     Returns the length of the path passing throught
@@ -109,10 +107,6 @@ def cartesian_matrix(coordinates):
             distance = (dx ** 2 + dy ** 2) ** 0.5
             matrix[i, j] = distance
     return matrix
-
-
-# This function takes a list of (x,y) tuples and outputs a dictionary that contains the distance between any pair of cities:
-m = cartesian_matrix([(0, 0), (1, 0), (1, 1)])
 
 # \[2,0\] gives the distance between the city with number 2 and the city with  number 0.
 # In our case the result of \[2,0\] is the same for \[0,2\], but for other TSPs this may not be the case (for example if a street between two cities is only one way - we have to take another route)
